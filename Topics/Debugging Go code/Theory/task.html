@@ -1,0 +1,195 @@
+<h2>Debugging Go code</h2>
+<div class="step-text">
+<p>You have already read about debugging in previous topics. Developers use this tool when their code doesn't run correctly. So what is debugging? In this topic, you will take a closer look at what it is and what tools are used for it.</p>
+<h5 id="what-is-debugging">What is debugging?</h5>
+<p>Once you've written your program, the first thing you try to do is compile the code and run your application. At this point, you may experience that your code does not compile. This may happen because you have made a number of mistakes. These errors are related to <strong>compile time</strong>. At this stage, the compiler will show all the errors and give them an exhaustive comment. And if you use an IDE, then the chances of making such mistakes are extremely small. The IDE usually highlights code that cannot be compiled.</p>
+<p>However, now we would like to discuss another type of error. Let's say you've already fixed all compilation errors, and your code is running. But the result of the program surprises you – it is wrong! These errors are related to <strong>runtime</strong>.</p>
+<p>To understand what went wrong, you need to know:</p>
+<ul>
+<li>current values of variables;</li>
+<li>which way the program was executed.</li>
+</ul>
+<p>Let's take a look at some tools that can help with this.</p>
+<h5 id="logging-as-a-debugging-tool">Logging as a debugging tool</h5>
+<p>This debugging method is the easiest. Many developers use <strong>logging</strong> to debug their code. Usually, after debugging, developers remove all lines of code associated with such debugging.</p>
+<p>Let's look at a simple example:</p>
+<pre><code class="language-go">package main
+
+import "fmt"
+
+func main() {
+    var array = []int{1, 2, 3, 4, 5, 6}
+    for _, num := range array {
+        if isEven(num) {
+            fmt.Printf("number %d is even\n", num)
+        } else {
+            fmt.Printf("number %d is odd\n", num)
+        }
+    }
+}
+
+func isEven(num int) bool {
+    res := num % 2
+    if res == 1 {
+        return true
+    }
+    return false
+}</code></pre>
+<p>This code determines if the number is even or not. You may have already noticed a bug in the function above. Of course, this is a synthetic example and the functions in your code will often be larger and more complex.</p>
+<p>To see where you made a mistake, you can output some data into the console:</p>
+<pre><code class="language-go">func isEven(num int) bool {
+    res := num % 2
+    if res == 1 {
+        fmt.Println(num, res, true)
+        return true
+    }
+    fmt.Println(num, res, false)
+    return false
+}</code></pre>
+<pre><code class="language-no-highlight">5 1 true</code></pre>
+<p>Thus, at any time when the function is called, you can get:</p>
+<ul>
+<li>function arguments value;</li>
+<li>function result;</li>
+<li>function execution path.</li>
+</ul>
+<p>However, the result obtained above is sometimes difficult to interpret. For example, if you need to keep track of more than one value or more than one function. In such cases, you can take advantage of all the formatted output features. So you can replace the code above with the following:</p>
+<pre><code class="language-go">func isEven(num int) bool {
+    res := num % 2
+    if res == 1 {
+        fmt.Printf("num = %d, res = %d, return true\n", num, res)
+        return true
+    }
+    fmt.Printf("num = %d, res = %d, , return false\n", num, res)
+    return false
+}</code></pre>
+<pre><code class="language-no-highlight">num = 5, res = 1, return true</code></pre>
+<p>Another way of logging with output to the console can be offered by the standard <code class="language-go">"log"</code> package. It extends the capabilities of the <code class="language-go">"fmt"</code> package. For example, you can see the log time and some other data. Let's look at the code below:</p>
+<pre><code class="language-go">func isEven(num int) bool {
+    logger := log.New(os.Stdout, "isEven: ", log.Lshortfile+log.Ltime+log.Ldate)
+    res := num % 2
+    if res == 1 {
+        logger.Printf("num = %d, res = %d, return true\n", num, res)
+        return true
+    }
+    logger.Printf("num = %d, res = %d, return false\n", num, res)
+    return false
+}</code></pre>
+<pre><code class="language-bash">isEven: 2022/09/18 22:23:29 even.go:24: num = 1, res = 1, return true</code></pre>
+<p></p><div class="alert alert-primary">You can see how to add some data to the log line – function name, date, time, and file name with line number. This data will be displayed in all logs within the scope of the logger variable. </div>
+<p>You can get a wider logging functionality using third-party packages like <a href="https://github.com/uber-go/zap" rel="noopener noreferrer nofollow" target="_blank">zap</a>, <a href="https://github.com/sirupsen/logrus" rel="noopener noreferrer nofollow" target="_blank">logrus</a>, or others. They allow much more flexible customization of output data. You will consider these possibilities separately in other topics.</p>
+<h5 id="delve-as-a-common-go-debug-tool">Delve as a common Go debug tool</h5>
+<p>Delve is a simple and, at the same time, effective command line utility. Let's see how it works and analyze the main functions.</p>
+<p>Firstly, to use Delve, you need to install it. This is a third-party utility, completely written on Go. If you use Go version 1.16 and above, just enter in the terminal:</p>
+<pre><code class="language-no-highlight">&gt; go install github.com/go-delve/delve/cmd/dlv@latest
+go: downloading github.com/go-delve/delve v1.9.1
+...</code></pre>
+<p></p><div class="alert alert-primary">You can find alternative methods of installing and setting up for MacOS in the instructions for the software package.</div>
+<p>After that, you can check the version set by your command:</p>
+<pre><code class="language-no-highlight">&gt; dlv version
+Delve Debugger
+Version: 1.9.1</code></pre>
+<p>The next important command is <code class="language-go">help</code>. This way, you can find out all the available commands and their brief description.</p>
+<pre><code class="language-bash">&gt; dlv help
+Delve is a source level debugger for Go programs.
+...</code></pre>
+<p>To launch the debugger, you can use one of the following commands:</p>
+<pre><code class="language-no-highlight">&gt; dlv debug [path to main package]
+&gt; dlv exec [path to executable file]
+&gt; dlv attach PID
+</code></pre>
+<ul>
+<li><code class="language-go">debug</code> – compiles your program and launches a debugger. If you run the command in the catalog with the <code class="language-go">main</code> package, then you can not indicate the path to the package.</li>
+<li><code class="language-go">exec</code> – launches a compiled executable file. Optionally accepts the path to the file.</li>
+<li><code class="language-go">attach</code> – connects to the advanced process according to its <code class="language-go">PID</code>.</li>
+</ul>
+<p>After starting the debug process, you will be prompted to input debug commands:</p>
+<pre><code class="language-no-highlight">Type 'help' for list of commands.
+(dlv)</code></pre>
+<p>The first thing the debugger offers to do is to see the entire list of commands. Let's try:</p>
+<pre><code class="language-no-highlight">(dlv) help</code></pre>
+<p>As you can see, the commands are divided into groups. Also, there are aliases for some of the most commonly used commands. For example: <code class="language-go">print (alias: p) ----- Evaluate an expression</code></p>
+<p>Let's look at some of the commands.</p>
+<h5 id="code-view-commands">Code view commands</h5>
+<p>The following commands will display part of the program code:</p>
+<pre><code class="language-no-highlight">(dlv) list ./even.go:5
+(dlv) list main.main
+(dlv) list main.main:10</code></pre>
+<p style="text-align: center;"><picture><source media="(max-width: 480px)" srcset="https://ucarecdn.com/97859ed3-78c6-4b70-9232-fc627c9d4329/-/stretch/off/-/resize/480x/-/format/webp/ 1x,https://ucarecdn.com/97859ed3-78c6-4b70-9232-fc627c9d4329/-/stretch/off/-/resize/960x/-/format/webp/ 2x,https://ucarecdn.com/97859ed3-78c6-4b70-9232-fc627c9d4329/-/stretch/off/-/resize/1440x/-/format/webp/ 3x" type="image/webp"/><source media="(max-width: 800px)" srcset="https://ucarecdn.com/97859ed3-78c6-4b70-9232-fc627c9d4329/-/stretch/off/-/resize/800x/-/format/webp/ 1x,https://ucarecdn.com/97859ed3-78c6-4b70-9232-fc627c9d4329/-/stretch/off/-/resize/1600x/-/format/webp/ 2x,https://ucarecdn.com/97859ed3-78c6-4b70-9232-fc627c9d4329/-/stretch/off/-/resize/2400x/-/format/webp/ 3x" type="image/webp"/><source srcset="https://ucarecdn.com/97859ed3-78c6-4b70-9232-fc627c9d4329/-/stretch/off/-/resize/1100x/-/format/webp/ 1x,https://ucarecdn.com/97859ed3-78c6-4b70-9232-fc627c9d4329/-/stretch/off/-/resize/2200x/-/format/webp/ 2x,https://ucarecdn.com/97859ed3-78c6-4b70-9232-fc627c9d4329/-/stretch/off/-/resize/3000x/-/format/webp/ 3x" type="image/webp"/><img alt="Code view commands" height="184" name="Screenshot from 2022-09-19 17-04-07.png" src="https://ucarecdn.com/97859ed3-78c6-4b70-9232-fc627c9d4329/" width="488"/></picture></p>
+<p>As an argument, the <code class="language-go">list</code> can accept:</p>
+<ul>
+<li>file name and displaced lines from the start of the file (available only in <code class="language-go">debug</code> mode when Delve is involved in the compilation of the program);</li>
+<li>the name of the package and the name of the function within the package with an optional displacement parameter relative to this function.</li>
+</ul>
+<h5 id="breakpoints">Breakpoints</h5>
+<p>Breakpoints are special marks where the debugger will stop. The <code class="language-go">break</code> command sets breakpoints:</p>
+<pre><code class="language-no-highlight">(dlv) break main.main:10
+Breakpoint 1 set at 0x4a64af for main.isEven() ./even.go:19
+(dlv) break ./even.go:22
+Breakpoint 2 set at 0x4a6520 for main.isEven() ./even.go:22
+</code></pre>
+<p>The first command sets the offset relative to the package and the function in the package, the second – relative to the beginning of the file. As a result of running the command, you can see:</p>
+<ul>
+<li>instruction address 0x4a64af;</li>
+<li>main.isEven() function;</li>
+<li>file and line number ./even.go:19.</li>
+</ul>
+<p><code class="language-go">breakpoints</code> command prints out all set breakpoints:</p>
+<pre><code class="language-no-highlight">(dlv) breakpoints
+Breakpoint runtime-fatal-throw (enabled) at 0x435260 for runtime.throw()
+/snap/go/9952/src/runtime/panic.go:982 (0)
+Breakpoint unrecovered-panic (enabled) at 0x435620 for runtime.fatalpanic()
+/snap/go/9952/src/runtime/panic.go:1065 (0)
+	print runtime.curg._panic.arg
+Breakpoint 1 (enabled) at 0x4a64af for main.isEven() ./even.go:19 (0)
+Breakpoint 2 (enabled) at 0x4a6520 for main.isEven() ./even.go:22 (0)</code></pre>
+<p>As you can see, there are two standard breakpoints in case of a panic or fatal error. Next, you can see all the breakpoints we set.</p>
+<p><code class="language-go">clear</code> command removes the break-point by its number:</p>
+<pre><code class="language-no-highlight">(dlv) clear 1
+Breakpoint 1 cleared at 0x4a64af for main.isEven() ./even.go:19
+(dlv) breakpoints
+Breakpoint runtime-fatal-throw (enabled) at 0x435260 for runtime.throw()
+/snap/go/9952/src/runtime/panic.go:982 (0)
+Breakpoint unrecovered-panic (enabled) at 0x435620 for runtime.fatalpanic()
+/snap/go/9952/src/runtime/panic.go:1065 (0)
+	print runtime.curg._panic.arg
+Breakpoint 2 (enabled) at 0x4a6520 for main.isEven() ./even.go:22 (0)</code></pre>
+<h5 id="code-navigation-commands">Code navigation commands</h5>
+<p>Using the following commands, you can control the steps of the program:</p>
+<pre><code class="language-no-highlight">(dlv) continue
+(dlv) next
+(dlv) step
+(dlv) stepout</code></pre>
+<p><code class="language-go">continue</code> – proceed to the next breakpoint, <code class="language-go">next</code> – go to the next line of the code, <code class="language-go">step</code> – go to the next step of the program, <code class="language-go">stepout</code> – go to a higher function.</p>
+<p style="text-align: center;"><picture><source media="(max-width: 480px)" srcset="https://ucarecdn.com/08948fc5-3706-4fc6-bb00-f425cfd5ac3a/-/stretch/off/-/resize/480x/-/format/webp/ 1x,https://ucarecdn.com/08948fc5-3706-4fc6-bb00-f425cfd5ac3a/-/stretch/off/-/resize/960x/-/format/webp/ 2x,https://ucarecdn.com/08948fc5-3706-4fc6-bb00-f425cfd5ac3a/-/stretch/off/-/resize/1440x/-/format/webp/ 3x" type="image/webp"/><source media="(max-width: 800px)" srcset="https://ucarecdn.com/08948fc5-3706-4fc6-bb00-f425cfd5ac3a/-/stretch/off/-/resize/800x/-/format/webp/ 1x,https://ucarecdn.com/08948fc5-3706-4fc6-bb00-f425cfd5ac3a/-/stretch/off/-/resize/1600x/-/format/webp/ 2x,https://ucarecdn.com/08948fc5-3706-4fc6-bb00-f425cfd5ac3a/-/stretch/off/-/resize/2400x/-/format/webp/ 3x" type="image/webp"/><source srcset="https://ucarecdn.com/08948fc5-3706-4fc6-bb00-f425cfd5ac3a/-/stretch/off/-/resize/1100x/-/format/webp/ 1x,https://ucarecdn.com/08948fc5-3706-4fc6-bb00-f425cfd5ac3a/-/stretch/off/-/resize/2200x/-/format/webp/ 2x,https://ucarecdn.com/08948fc5-3706-4fc6-bb00-f425cfd5ac3a/-/stretch/off/-/resize/3000x/-/format/webp/ 3x" type="image/webp"/><img alt="logger.Printf() function code" height="468" name="Screenshot from 2022-09-19 17-24-36.png" src="https://ucarecdn.com/08948fc5-3706-4fc6-bb00-f425cfd5ac3a/" width="837"/></picture></p>
+<p></p><div class="alert alert-primary">Note that the functions of <code class="language-go">next</code> and <code class="language-go">step</code> also allow you to go through the functions of standard Go packages. In the example above, you can see the <code class="language-go">logger.Printf()</code> function code.</div>
+<h5 id="variable-view-commands">Variable view commands</h5>
+<p>The last block we'll look at are functions that display the values of variables at the program's breakpoint. To do this, you can go to some function. In this case, it is the <code class="language-go">isEven()</code> function of the <code class="language-go">main</code> package:</p>
+<p style="text-align: center;"><picture><source media="(max-width: 480px)" srcset="https://ucarecdn.com/1af39735-138d-4169-ab8e-6ee797fee076/-/stretch/off/-/resize/480x/-/format/webp/ 1x,https://ucarecdn.com/1af39735-138d-4169-ab8e-6ee797fee076/-/stretch/off/-/resize/960x/-/format/webp/ 2x,https://ucarecdn.com/1af39735-138d-4169-ab8e-6ee797fee076/-/stretch/off/-/resize/1440x/-/format/webp/ 3x" type="image/webp"/><source media="(max-width: 800px)" srcset="https://ucarecdn.com/1af39735-138d-4169-ab8e-6ee797fee076/-/stretch/off/-/resize/800x/-/format/webp/ 1x,https://ucarecdn.com/1af39735-138d-4169-ab8e-6ee797fee076/-/stretch/off/-/resize/1600x/-/format/webp/ 2x,https://ucarecdn.com/1af39735-138d-4169-ab8e-6ee797fee076/-/stretch/off/-/resize/2400x/-/format/webp/ 3x" type="image/webp"/><source srcset="https://ucarecdn.com/1af39735-138d-4169-ab8e-6ee797fee076/-/stretch/off/-/resize/1100x/-/format/webp/ 1x,https://ucarecdn.com/1af39735-138d-4169-ab8e-6ee797fee076/-/stretch/off/-/resize/2200x/-/format/webp/ 2x,https://ucarecdn.com/1af39735-138d-4169-ab8e-6ee797fee076/-/stretch/off/-/resize/3000x/-/format/webp/ 3x" type="image/webp"/><img alt="isEven() function" height="162" name="Screenshot from 2022-09-19 17-34-31.png" src="https://ucarecdn.com/1af39735-138d-4169-ab8e-6ee797fee076/" width="837"/></picture></p>
+<p> <code class="language-go">args</code> displays all the arguments of the function that is currently performed:</p>
+<pre><code class="language-no-highlight">(dlv) args
+num = 1
+~r0 = false</code></pre>
+<p></p><div class="alert alert-primary">Note that at this step, the result of the function is still unknown, and it has the default value (<code class="language-go">false</code>). The value returned to the function is calculated at the time of exiting this function.</div>
+<p>The following command prints all local variables known at the time of execution. In this case, these are <code class="language-go">logger</code> and <code class="language-go">res</code>. Since <code class="language-go">logger</code> does not belong to the main types of Go; you get its type in the output. You also get the address at which the value of the variable is stored, since <code class="language-go">*log.Logger</code> is a linked type of data.</p>
+<pre><code class="language-no-highlight">(dlv) locals
+logger = (*log.Logger)(0xc0000600a0)
+res = 1</code></pre>
+<p><code class="language-go">print</code> displays the value of the requested variable:</p>
+<pre><code class="language-no-highlight">(dlv) print num
+2</code></pre>
+<p>Keep in mind that you can only get the values of variables that are visible in the current scope. For example, if you try to get the value of the variable <code class="language-go">array</code>, which is declared inside the <code class="language-go">main()</code> function, while in the <code class="language-go">isEven()</code> function, you will get the following output:</p>
+<pre><code class="language-no-highlight">(dlv) print array
+Command failed: could not find symbol value for array</code></pre>
+<p>In this case, being in the <code class="language-go">main</code> function, you will receive the correct value:</p>
+<pre><code class="language-no-highlight">(dlv) print array
+[]int len: 6, cap: 6, [1,2,3,4,5,6]</code></pre>
+<h5 id="conclusion">Conclusion</h5>
+<p>In this topic, you once again looked at what debugging is. In practical examples, you examined the following methods of debugging:</p>
+<ul>
+<li>debugging using an additional code to output variables to the console;</li>
+<li>debugging using the external debugger Delve.</li>
+</ul>
+<p>Both of these methods are useful tools that developers use in their work. It should be noted that the first method requires changing the program code and new compilation. Whereas Delve can be used even in cases where the program is already launched, and you are not able to stop it.</p>
+<p>And yet, most often, the debugger is used at the time of development. Therefore, the choice of the method of debugging the program is only your personal solution!</p>
+</div>
